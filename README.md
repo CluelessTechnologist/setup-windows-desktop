@@ -102,6 +102,7 @@ Like the sway config, with `alt` as the modifier:
 | `alt+r` | Resize mode (`h/j/k/l`, `esc` to leave) |
 | `alt+enter` | Windows Terminal |
 | `alt+d` | Flow Launcher |
+| `alt+f1` / `alt+f2` | Firefox / File Explorer |
 | `alt+shift+q` | Close window |
 | `alt+shift+r` | Reload config |
 | `alt+shift+e` | Exit GlazeWM |

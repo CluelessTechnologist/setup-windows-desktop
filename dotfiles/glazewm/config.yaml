@@ -302,6 +302,13 @@ keybindings:
   - commands: ['shell-exec wt']
     bindings: ['alt+enter']
 
+  # Launch Firefox and File Explorer, like mod+F1/F2 in the sway config.
+  # Nothing happens if Firefox isn't installed.
+  - commands: ['shell-exec firefox']
+    bindings: ['alt+f1']
+  - commands: ['shell-exec explorer']
+    bindings: ['alt+f2']
+
   # Focus the next/previous active workspace defined in `workspaces` config.
   - commands: ['focus --next-active-workspace']
     bindings: ['alt+s']

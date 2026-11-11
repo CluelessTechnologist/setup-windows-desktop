@@ -67,7 +67,7 @@ param(
   [ValidateSet('None', 'AutoHotkey')]
   [string]$KeyRemap,
 
-  [ValidateSet('Apps', 'GlazeWM', 'Dotfiles', 'Theme', 'Autostart')]
+  # Validated below: `powershell -File` passes "Apps,Theme" as one string.
   [string[]]$Skip = @(),
 
   [switch]$Unattended,
@@ -82,6 +82,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$Skip = @($Skip -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$allSteps = 'Apps', 'GlazeWM', 'Dotfiles', 'Theme', 'Autostart'
+foreach ($step in $Skip) {
+  if ($allSteps -notcontains $step) {
+    throw "Unknown step '$step' in -Skip. Steps: $($allSteps -join ', ')."
+  }
+}
 $ProgressPreference = 'SilentlyContinue'  # Makes Invoke-WebRequest fast.
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -196,6 +203,18 @@ function Install-WingetPackage($package) {
   }
 }
 
+# Stops processes by name. A process running as administrator can't be
+# stopped from a normal PowerShell, so that gets a clear message.
+function Stop-App([string[]]$names, [string]$label) {
+  foreach ($process in Get-Process $names -ErrorAction SilentlyContinue) {
+    try {
+      $process | Stop-Process -Force -ErrorAction Stop
+    } catch {
+      throw "Could not stop $label ($($process.Name), PID $($process.Id)); it probably runs as administrator. Close it, or run this script as administrator, and run the script again."
+    }
+  }
+}
+
 # Asks a running GlazeWM to exit, so its shutdown commands run and hidden
 # windows are shown again, then makes sure it's gone.
 function Stop-GlazeWM {
@@ -211,7 +230,7 @@ function Stop-GlazeWM {
       Start-Sleep -Milliseconds 300
     }
   }
-  Get-Process glazewm, glazewm-watcher -ErrorAction SilentlyContinue | Stop-Process -Force
+  Stop-App 'glazewm', 'glazewm-watcher' 'GlazeWM'
 }
 
 function New-StartupShortcut([string]$name, [string]$target, [string]$arguments = '') {
@@ -284,7 +303,7 @@ if (-not $KeyRemap) {
 
 $themeDir = Join-Path $repo "themes\$Theme"
 $themeConfig = Import-PowerShellDataFile (Join-Path $themeDir 'theme.psd1')
-$steps = 'Apps', 'GlazeWM', 'Dotfiles', 'Theme', 'Autostart' | Where-Object { Test-Step $_ }
+$steps = $allSteps | Where-Object { Test-Step $_ }
 
 Write-Host ''
 Write-Host "Theme:     $Theme"
@@ -394,7 +413,7 @@ if (Test-Step 'Dotfiles') {
   # changed; the rest of the user's settings are kept.
   $flowRunning = [bool](Get-Process Flow.Launcher -ErrorAction SilentlyContinue)
   if ($flowRunning -and $PSCmdlet.ShouldProcess('Flow Launcher', 'Stop')) {
-    Get-Process Flow.Launcher | Stop-Process -Force
+    Stop-App 'Flow.Launcher' 'Flow Launcher'
     Start-Sleep 1
   }
   Install-File "$themeDir\flowlauncher.xaml" "$flowDir\Themes\$($themeConfig.FlowTheme).xaml"

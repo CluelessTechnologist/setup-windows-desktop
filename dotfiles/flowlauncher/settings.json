@@ -1,0 +1,9 @@
+{
+  "Hotkey": "Alt + D",
+  "Theme": "Gruvbox",
+  "QueryBoxFont": "Cascadia Mono",
+  "ResultFont": "Cascadia Mono",
+  "ResultSubFont": "Cascadia Mono",
+  "UseDropShadowEffect": false,
+  "HideOnStartup": true
+}

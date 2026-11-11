@@ -1,0 +1,31 @@
+{
+  "schemes": [
+    {
+      "name": "Gruvbox Dark",
+      "background": "#282828",
+      "foreground": "#EBDBB2",
+      "cursorColor": "#EBDBB2",
+      "selectionBackground": "#665C54",
+      "black": "#282828",
+      "red": "#CC241D",
+      "green": "#98971A",
+      "yellow": "#D79921",
+      "blue": "#458588",
+      "purple": "#B16286",
+      "cyan": "#689D6A",
+      "white": "#A89984",
+      "brightBlack": "#928374",
+      "brightRed": "#FB4934",
+      "brightGreen": "#B8BB26",
+      "brightYellow": "#FABD2F",
+      "brightBlue": "#83A598",
+      "brightPurple": "#D3869B",
+      "brightCyan": "#8EC07C",
+      "brightWhite": "#EBDBB2"
+    }
+  ],
+  "profiles": [
+    { "updates": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", "colorScheme": "Gruvbox Dark" },
+    { "updates": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}", "colorScheme": "Gruvbox Dark" }
+  ]
+}

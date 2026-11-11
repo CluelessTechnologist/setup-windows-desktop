@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Custom styles. -->
+    <link rel="stylesheet" type="text/css" href="./styles.css" />
+
+    <!-- Allows React to be run buildless via "text/babel" script below. -->
+    <script
+      src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"
+      integrity="sha256-aS0B0wnsaDByLfE16h4MDCP1fQFccysd1YWOcV+gbBo="
+      crossorigin="anonymous"
+    ></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!--
+      Layout follows the waybar config from the sway setup:
+      left: workspaces, binding mode | center: network, power, Run, help |
+      right: battery, BTC, disk, CPU, memory, volume, clock, tray.
+      Buttons run their commands through GlazeWM's `shell-exec`, so the
+      widget needs no shell privileges of its own.
+    -->
+    <script type="text/babel" data-type="module">
+      import React, {
+        useState,
+        useEffect,
+      } from 'https://esm.sh/react@18?dev';
+      import { createRoot } from 'https://esm.sh/react-dom@18/client?dev';
+      import * as zebar from 'https://esm.sh/zebar@3.0';
+
+      const providers = zebar.createProviderGroup({
+        glazewm: { type: 'glazewm' },
+        network: { type: 'network', refreshInterval: 1000 },
+        battery: { type: 'battery' },
+        disk: { type: 'disk', refreshInterval: 30000 },
+        cpu: { type: 'cpu' },
+        memory: { type: 'memory' },
+        audio: { type: 'audio' },
+        date: {
+          type: 'date',
+          formatting: 'yyyy-MM-dd HH:mm:ss',
+          refreshInterval: 1000,
+        },
+        systray: { type: 'systray' },
+      });
+
+      const commands = {
+        run: 'shell-exec %LOCALAPPDATA%\\FlowLauncher\\Flow.Launcher.exe',
+        // The classic "Shut Down Windows" dialog (sign out, sleep,
+        // restart, shut down), standing in for wlogout.
+        power:
+          'shell-exec powershell -NoProfile -WindowStyle Hidden -Command (New-Object -ComObject Shell.Application).ShutdownWindows()',
+        help: 'shell-exec notepad %USERPROFILE%\\.glzr\\glazewm\\config.yaml',
+        network: 'shell-exec ms-settings:network',
+      };
+
+      createRoot(document.getElementById('root')).render(<App />);
+
+      // Formats a zebar data size, e.g. `16.5GiB`.
+      function size(measure, digits = 1) {
+        return `${measure.iecValue.toFixed(digits)}${measure.iecUnit}`;
+      }
+
+      // Bitcoin price in USD, refreshed every 150s like waybar's
+      // custom/btc module.
+      function useBtcPrice() {
+        const [price, setPrice] = useState(null);
+
+        useEffect(() => {
+          async function update() {
+            try {
+              const res = await fetch(
+                'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+              );
+              const json = await res.json();
+              setPrice(Math.floor(json.bitcoin.usd));
+            } catch {
+              // Keep the last known price.
+            }
+          }
+
+          update();
+          const timer = setInterval(update, 150_000);
+          return () => clearInterval(timer);
+        }, []);
+
+        return price;
+      }
+
+      function App() {
+        const [output, setOutput] = useState(providers.outputMap);
+        const btc = useBtcPrice();
+
+        useEffect(() => {
+          providers.onOutput(() => setOutput(providers.outputMap));
+        }, []);
+
+        const glazewm = output.glazewm;
+        const run = command => glazewm?.runCommand(command);
+        const systemDisk = output.disk?.disks.find(d =>
+          d.mountPoint.startsWith('C:'),
+        );
+        const speaker = output.audio?.defaultPlaybackDevice;
+
+        return (
+          <div className="app">
+            <div className="left">
+              {glazewm && (
+                <div className="workspaces">
+                  {glazewm.currentWorkspaces.map(workspace => (
+                    <button
+                      className={`workspace ${workspace.hasFocus ? 'focused' : ''}`}
+                      onClick={() =>
+                        run(`focus --workspace ${workspace.name}`)
+                      }
+                      key={workspace.name}
+                    >
+                      {workspace.displayName ?? workspace.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {glazewm?.bindingModes.map(bindingMode => (
+                <span
+                  className="pill binding-mode"
+                  key={bindingMode.name}
+                  onClick={() =>
+                    run(`wm-disable-binding-mode --name ${bindingMode.name}`)
+                  }
+                >
+                  {bindingMode.displayName ?? bindingMode.name}
+                </span>
+              ))}
+
+              {glazewm?.isPaused && (
+                <span
+                  className="pill paused"
+                  onClick={() => run('wm-toggle-pause')}
+                >
+                  paused
+                </span>
+              )}
+            </div>
+
+            <div className="center">
+              {output.network && (
+                <span
+                  className="pill"
+                  onClick={() => run(commands.network)}
+                >
+                  {output.network.defaultInterface
+                    ? `${output.network.defaultInterface.friendlyName ?? output.network.defaultInterface.name}: ` +
+                      (output.network.traffic
+                        ? `↑ ${size(output.network.traffic.transmitted)}/s ↓ ${size(output.network.traffic.received)}/s`
+                        : '')
+                    : 'No network connected'}
+                </span>
+              )}
+              <button
+                className="bevel power"
+                onClick={() => run(commands.power)}
+              >
+                {' ⏻ '}
+              </button>
+              <button className="bevel" onClick={() => run(commands.run)}>
+                Run
+              </button>
+              <button className="bevel" onClick={() => run(commands.help)}>
+                {' ? '}
+              </button>
+            </div>
+
+            <div className="right">
+              {output.battery && (
+                <span className="pill">
+                  {Math.round(output.battery.chargePercent)}%
+                  {output.battery.isCharging ? ' 󰂄' : ''}
+                </span>
+              )}
+
+              {btc !== null && (
+                <span className="pill">₿ {btc.toLocaleString('en-US')}</span>
+              )}
+
+              {systemDisk && (
+                <span className="pill">
+                  C:\ Free: {size(systemDisk.availableSpace)}
+                </span>
+              )}
+
+              {output.cpu && (
+                <span className="pill">
+                  CPU: {Math.round(output.cpu.usage)}%
+                </span>
+              )}
+
+              {output.memory && (
+                <span className="pill">
+                  Mem: {(output.memory.usedMemory / 2 ** 30).toFixed(2)}/
+                  {(output.memory.totalMemory / 2 ** 30).toFixed(2)} GiB{' '}
+                  {Math.round(output.memory.usage)}%
+                </span>
+              )}
+
+              {speaker && (
+                <span
+                  className="pill"
+                  onClick={() => output.audio.setMute(!speaker.isMuted)}
+                  onWheel={e =>
+                    output.audio.setVolume(
+                      Math.min(
+                        100,
+                        Math.max(0, speaker.volume - Math.sign(e.deltaY) * 5),
+                      ),
+                    )
+                  }
+                >
+                  {speaker.isMuted ? '🔇' : `${Math.round(speaker.volume)}% 🔊`}
+                </span>
+              )}
+
+              {output.date && (
+                <span className="pill">{output.date.formatted}</span>
+              )}
+
+              {output.systray && (
+                <div className="tray">
+                  {output.systray.icons.map(icon => (
+                    <img
+                      key={icon.id}
+                      src={icon.iconUrl}
+                      title={icon.tooltip}
+                      onClick={e => {
+                        e.preventDefault();
+                        output.systray.onLeftClick(icon.id);
+                      }}
+                      onContextMenu={e => {
+                        e.preventDefault();
+                        output.systray.onRightClick(icon.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+    </script>
+  </body>
+</html>

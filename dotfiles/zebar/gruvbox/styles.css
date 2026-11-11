@@ -1,0 +1,136 @@
+/**
+ * Gruvbox bar styled after the waybar config from the sway setup
+ * (CluelessTechnologist/setup-desktop-environment): a near-black bar with
+ * #282828 "pills", yellow bold text and Win95-style bevelled buttons.
+ */
+
+:root {
+  --bar: #0b0c0d;
+  --pill: #282828;
+  --text: #d79921;
+  --ws-text: #ffc94a;
+  --ws-focused-text: #ffd77a;
+  --ws-focused-bg: #504945;
+  --red: #cc241d;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bar);
+  color: var(--text);
+  font-family: Sans, 'Segoe UI', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+div,
+span,
+button {
+  cursor: default;
+  user-select: none;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 100%;
+}
+
+.left,
+.center,
+.right {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.center {
+  justify-content: center;
+}
+
+.right {
+  justify-content: flex-end;
+}
+
+/* Modules: rounded #282828 pills, like waybar's #clock, #cpu, ... */
+.pill {
+  margin: 2px 0;
+  padding: 1px 8px;
+  border-radius: 8px;
+  background: var(--pill);
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* Run, ? and power: bevelled buttons, like waybar's #custom-run. */
+.bevel {
+  margin: 2px;
+  padding: 1px 4px;
+  border: none;
+  border-left: 1px solid #ffffff;
+  border-top: 1px solid #ffffff;
+  border-bottom: 1px solid #404040;
+  border-radius: 3px;
+  box-shadow: 1px 1px 1px 0 #000000;
+  background: var(--pill);
+  color: var(--text);
+  font: inherit;
+}
+
+.bevel.power {
+  color: var(--red);
+}
+
+/* Workspaces. */
+.workspaces {
+  display: flex;
+  margin: 2px;
+  padding: 0 2px 0 6px;
+  border-radius: 6px;
+  background: var(--pill);
+}
+
+.workspace {
+  min-width: 20px;
+  margin: 2px 3px;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: var(--pill);
+  color: var(--ws-text);
+  font: inherit;
+}
+
+.workspace.focused {
+  border-bottom: 2px outset var(--red);
+  background: var(--ws-focused-bg);
+  color: var(--ws-focused-text);
+}
+
+.binding-mode {
+  font-style: italic;
+}
+
+.paused {
+  color: var(--red);
+}
+
+/* System tray, like waybar's #tray. */
+.tray {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.tray img {
+  width: 14px;
+  height: 14px;
+}

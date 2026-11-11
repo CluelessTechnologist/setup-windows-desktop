@@ -44,7 +44,7 @@ Without git, download the repository as a zip and run `deploy.ps1` from the unpa
 
 To see what would happen without changing anything, add `-WhatIf`. Run the script again at any time to switch theme; files that are already right are left alone.
 
-Sign out and back in at the end, so the taskbar picks up its new size and colours.
+The taskbar only picks up light/dark mode, its size and colours when Explorer starts, so the script offers to restart Explorer when those changed. If you say no, sign out and back in later.
 
 ## Options
 
@@ -58,6 +58,7 @@ Sign out and back in at the end, so the taskbar picks up its new size and colour
 | `-GlazeWMRepository owner/repo` | `CluelessTechnologist/glazewm` | Installs GlazeWM from another fork. Its releases need a `*-x64.zip` and a `SHA256SUMS` file. |
 | `-InstallDir <path>` | `%LOCALAPPDATA%\Programs\glazewm-tabs` | Where GlazeWM is unpacked. |
 | `-NoStart` | | Don't start GlazeWM and Flow Launcher at the end. |
+| `-RestartExplorer` | asked | Restart Explorer without asking, so the taskbar picks up light/dark mode, size and colours. Without it, the script asks when those changed. Open File Explorer windows close. |
 
 ## What the script changes
 

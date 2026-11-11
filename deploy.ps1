@@ -54,6 +54,12 @@
 .PARAMETER NoStart
   Don't start GlazeWM and Flow Launcher at the end.
 
+.PARAMETER RestartExplorer
+  Restart Explorer at the end of the Theme step, without asking. The
+  taskbar only picks up light/dark mode, its size and accent colour when
+  Explorer starts. Without this, the script asks when those settings
+  changed. Open File Explorer windows are closed.
+
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
@@ -78,7 +84,9 @@ param(
 
   [string]$InstallDir = "$env:LOCALAPPDATA\Programs\glazewm-tabs",
 
-  [switch]$NoStart
+  [switch]$NoStart,
+
+  [switch]$RestartExplorer
 )
 
 $ErrorActionPreference = 'Stop'
@@ -470,6 +478,17 @@ if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', "Apply $The
   $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
   $desktop = 'HKCU:\Control Panel\Desktop'
 
+  # The taskbar reads these only when Explorer starts.
+  $taskbarValues = {
+    $values = foreach ($item in @(
+        @($personalize, 'SystemUsesLightTheme'), @($personalize, 'ColorPrevalence'),
+        @($advanced, 'TaskbarSize'), @($accent, 'AccentColorMenu'), @($accent, 'StartColorMenu'))) {
+      (Get-ItemProperty $item[0] -ErrorAction SilentlyContinue).($item[1])
+    }
+    $values -join ','
+  }
+  $taskbarBefore = & $taskbarValues
+
   # Light or dark mode for apps and the system.
   $light = [int](-not $themeConfig.DarkMode)
   Set-ItemProperty $personalize -Name AppsUseLightTheme -Value $light -Type DWord
@@ -516,7 +535,28 @@ public static class SetupDesktop {
 
   [SetupDesktop]::Broadcast('ImmersiveColorSet')
   [SetupDesktop]::Broadcast('WindowsThemeElement')
-  Write-Host '    Done. Sign out and in for the taskbar size and colours.'
+
+  $taskbarChanged = (& $taskbarValues) -ne $taskbarBefore
+  if ($RestartExplorer -or $taskbarChanged) {
+    $restart = $RestartExplorer -or ($ask -and [Environment]::UserInteractive -and
+      (Read-Choice 'Restart Explorer now so the taskbar picks up the change? Open File Explorer windows will close.' @('yes', 'no') 'yes') -eq 'yes')
+    if ($restart) {
+      # Stop only the Explorer process that owns the taskbar; Windows starts
+      # the shell again by itself.
+      Add-Type -Name Taskbar -Namespace SetupDesktop -MemberDefinition @'
+[DllImport("user32.dll")] public static extern IntPtr FindWindow(string cls, string title);
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+'@
+      $shellPid = 0
+      [SetupDesktop.Taskbar]::GetWindowThreadProcessId([SetupDesktop.Taskbar]::FindWindow('Shell_TrayWnd', $null), [ref]$shellPid) | Out-Null
+      if ($shellPid) { Stop-Process -Id $shellPid -Force }
+      Start-Sleep 5
+      if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
+      Write-Host '    Explorer restarted.'
+    } else {
+      Write-Host '    Sign out and in (or rerun with -RestartExplorer) for the taskbar to change.'
+    }
+  }
 }
 
 if (Test-Step 'Autostart') {

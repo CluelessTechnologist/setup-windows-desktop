@@ -2,7 +2,7 @@
 
 ## About
 
-A Windows 11 take on [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment), which bootstraps sway and i3 desktops with Ansible. When I have to use Windows I want the same workflow: a tiling window manager with tabs, a bar at the top, a keyboard launcher and a uniform gruvbox look. One script sets that up, so a new machine looks and works the same in a few minutes.
+A Windows 11 take on [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment), which bootstraps sway and i3 desktops with Ansible. When I have to use Windows I want the same workflow: a tiling window manager with tabs, a bar at the top, a keyboard launcher and a uniform look, with the same gruvbox and Windows 95 themes. One script sets that up, so a new machine looks and works the same in a few minutes.
 
 Everything is per user. The script doesn't patch Windows, doesn't disable anything and keeps a backup of every config file it replaces.
 
@@ -11,9 +11,9 @@ Everything is per user. The script doesn't patch Windows, doesn't disable anythi
 | Window manager | sway, `workspace_layout tabbed` | [GlazeWM](https://github.com/glzr-io/glazewm), using a [fork with sway-style tabs](https://github.com/CluelessTechnologist/glazewm) |
 | Bar | waybar | [Zebar](https://github.com/glzr-io/zebar), styled like the waybar |
 | Launcher | bemenu (`mod+d`) | [Flow Launcher](https://github.com/Flow-Launcher/Flow.Launcher) (`alt+d`) |
-| Terminal colours | alacritty | Windows Terminal (gruvbox scheme) |
+| Terminal colours | alacritty | Windows Terminal (colour scheme per theme) |
 | Modifier | `Mod4` (Windows key) | `alt`, optionally also the left Windows key ([AutoHotkey](https://www.autohotkey.com/)) |
-| Theme | gruvbox | gruvbox: dark mode, accent colours, wallpaper |
+| Themes | gruvbox, win95 | gruvbox, win95: bar, tabs, launcher, terminal, light/dark mode, accent colours, wallpaper |
 
 ## Supported OSes
 
@@ -31,9 +31,18 @@ cd setup-windows-desktop
 powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 ```
 
+Like the Ansible playbooks, the script asks a few questions first, then shows a summary and asks before it changes anything:
+
+```
+    gruvbox - Gruvbox dark: blue focus, yellow text, forest wallpaper
+    win95 - Windows 95: grey bevelled bar, navy focus and title bars
+Choose theme (gruvbox/win95) [gruvbox]:
+Make the left Windows key act as Alt with AutoHotkey? (yes/no) [no]:
+```
+
 Without git, download the repository as a zip and run `deploy.ps1` from the unpacked folder. `-ExecutionPolicy Bypass` only applies to this one run; the machine's execution policy isn't changed.
 
-To see what would happen without changing anything, add `-WhatIf`.
+To see what would happen without changing anything, add `-WhatIf`. Run the script again at any time to switch theme; files that are already right are left alone.
 
 Sign out and back in at the end, so the taskbar picks up its new size and colours.
 
@@ -41,7 +50,9 @@ Sign out and back in at the end, so the taskbar picks up its new size and colour
 
 | Parameter | Default | |
 |---|---|---|
-| `-KeyRemap AutoHotkey` | `None` | Also installs AutoHotkey and makes the left Windows key act as Alt. The Start menu stays on `ctrl+esc` and the right Windows key. |
+| `-Theme gruvbox\|win95` | asked | Which theme to deploy (a folder under `themes/`). |
+| `-KeyRemap None\|AutoHotkey` | asked | `AutoHotkey` also installs AutoHotkey and makes the left Windows key act as Alt. The Start menu stays on `ctrl+esc` and the right Windows key. |
+| `-Unattended` | | Don't ask anything: `gruvbox` and `None` unless given. |
 | `-Skip Apps,GlazeWM,Dotfiles,Theme,Autostart` | none | Leaves out steps, e.g. `-Skip Theme` to keep your current look. |
 | `-GlazeWMVersion v3.10.1-tabs.2` | `latest` | A specific release of the fork. |
 | `-GlazeWMRepository owner/repo` | `CluelessTechnologist/glazewm` | Installs GlazeWM from another fork. Its releases need a `*-x64.zip` and a `SHA256SUMS` file. |
@@ -52,15 +63,15 @@ Sign out and back in at the end, so the taskbar picks up its new size and colour
 
 So you know exactly what you're running:
 
-* **Apps (winget):** `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Zebar and AutoHotkey install for all users, so Windows may ask for admin rights.
+* **Apps (winget):** `Git.Git`, `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Each one is skipped if it's already installed, also when it wasn't installed with winget. Git, Zebar and AutoHotkey install for all users, so Windows may ask for admin rights.
 * **GlazeWM:** the latest release zip of the fork, from GitHub. The download is checked against the release's `SHA256SUMS` before it's unpacked to `-InstallDir`. The binaries are built by the fork's [release workflow](https://github.com/CluelessTechnologist/glazewm/blob/fork/.github/workflows/fork-release.yaml) and are **not code signed**.
 * **Config files:**
-  * `~\.glzr\glazewm\config.yaml`
-  * `~\.glzr\zebar\settings.json` and `~\.glzr\zebar\gruvbox\`
-  * `%APPDATA%\FlowLauncher\Themes\Gruvbox.xaml`, and a few keys in `%APPDATA%\FlowLauncher\Settings\Settings.json` (hotkey, theme, font). Your other Flow settings are kept.
-  * A Windows Terminal fragment in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\gruvbox\` that adds the colour scheme to the built-in PowerShell and Command Prompt profiles. Your `settings.json` isn't touched.
+  * `~\.glzr\glazewm\config.yaml`, with the theme's colours filled in.
+  * `~\.glzr\zebar\settings.json` and `~\.glzr\zebar\desktop-bar\`
+  * `%APPDATA%\FlowLauncher\Themes\Gruvbox.xaml` or `Win95.xaml`, and a few keys in `%APPDATA%\FlowLauncher\Settings\Settings.json` (hotkey, theme, font). Your other Flow settings are kept.
+  * A Windows Terminal fragment in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\setup-windows-desktop\` that adds the theme's colour scheme to the built-in PowerShell and Command Prompt profiles. Your `settings.json` isn't touched.
   * `~\.config\autohotkey\lwin-to-alt.ahk` with `-KeyRemap AutoHotkey`.
-* **Look (registry, `HKCU` only):** dark mode, the accent colour palette, accent on Start and taskbar, small taskbar, and the wallpaper copied to your Pictures folder.
+* **Look (registry, `HKCU` only):** light or dark mode, the accent colour palette, accent on Start and taskbar (gruvbox) or on title bars (win95), small taskbar, desktop colour, and the theme's wallpaper copied to your Pictures folder.
 * **Autostart:** shortcuts in your Startup folder (`shell:startup`) for GlazeWM, Flow Launcher and the key remap. GlazeWM starts Zebar itself.
 
 Every file that gets replaced is first copied to `%LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>\`.
@@ -110,22 +121,25 @@ The setup is meant to be light enough for a managed machine: per-user, no servic
 | Path | What |
 |---|---|
 | `deploy.ps1` | The deploy script |
-| `dotfiles/glazewm/` | GlazeWM config |
-| `dotfiles/zebar/` | Zebar settings and the `gruvbox` bar |
-| `dotfiles/flowlauncher/` | Flow Launcher theme and the settings that get merged in |
-| `dotfiles/windows-terminal/` | Windows Terminal colour scheme fragment |
+| `dotfiles/glazewm/` | GlazeWM config, with `{{placeholders}}` for the theme's colours |
+| `dotfiles/zebar/` | Zebar settings and the `desktop-bar` (layout only) |
+| `dotfiles/flowlauncher/` | Flow Launcher settings that get merged in |
 | `dotfiles/autohotkey/` | Left Windows key to Alt |
-| `wallpapers/` | Wallpaper |
+| `themes/<name>/` | A theme: `theme.psd1` (colours, light/dark, accent, wallpaper) and its bar style, Flow Launcher theme and Windows Terminal scheme |
+| `wallpapers/` | Wallpapers |
+
+To add a theme, copy `themes/gruvbox` to a new folder and change it. The script finds it by its folder name.
 
 ## Credits
 
-* [GlazeWM](https://github.com/glzr-io/glazewm) and [Zebar](https://github.com/glzr-io/zebar) by glzr-io (GPL-3.0). The bar in `dotfiles/zebar/gruvbox/` started from Zebar's starter pack.
+* [GlazeWM](https://github.com/glzr-io/glazewm) and [Zebar](https://github.com/glzr-io/zebar) by glzr-io (GPL-3.0). The bar in `dotfiles/zebar/desktop-bar/` started from Zebar's starter pack.
 * The [gruvbox](https://github.com/morhetz/gruvbox) palette by Pavel Pertsev (MIT).
-* The wallpaper is the same one as in [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment).
+* The win95 colours are the Base16 Windows 95 scheme by Fergus Collins, modified for setup-desktop-environment. The win95 terminal colours are the Hyper scheme from [alacritty-theme](https://github.com/alacritty/alacritty-theme).
+* The wallpapers are the same ones as in [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment).
 
 ## License
 
 [MIT](LICENSE), except for two files derived from GPL-3.0 projects, which stay under [GPL-3.0](LICENSE-GPL-3.0.md):
 
 * `dotfiles/glazewm/config.yaml`, based on GlazeWM's sample config.
-* `dotfiles/zebar/gruvbox/`, based on Zebar's starter pack.
+* `dotfiles/zebar/desktop-bar/` and `themes/*/zebar.css`, based on Zebar's starter pack.

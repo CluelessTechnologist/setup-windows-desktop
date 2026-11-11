@@ -63,30 +63,32 @@ gaps:
 
 # Appearance of the tab bar shown above containers with the tabbed layout.
 # ** Tab bars are currently only drawn on Windows.
+# Colours and font come from themes/<theme>/theme.psd1; deploy.ps1 fills
+# in the {{...}} placeholders.
 tab_bar:
-  font_family: 'Cascadia Mono'
-  font_size: '12px'
+  font_family: '{{tab_font_family}}'
+  font_size: '{{tab_font_size}}'
 
   # Alignment of the tab titles: 'left' (like sway) or 'center'.
   text_align: 'left'
 
   # Active tab of the container that has focus.
   focused:
-    background: '#458588'
-    border: '#458588'
-    text: '#1d2021'
+    background: '{{tab_focused_background}}'
+    border: '{{tab_focused_border}}'
+    text: '{{tab_focused_text}}'
 
   # Active tab of a container that doesn't have focus.
   focused_inactive:
-    background: '#1d2021'
-    border: '#1d2021'
-    text: '#d79921'
+    background: '{{tab_focused_inactive_background}}'
+    border: '{{tab_focused_inactive_border}}'
+    text: '{{tab_focused_inactive_text}}'
 
   # Tabs that aren't active.
   unfocused:
-    background: '#1d2021'
-    border: '#1d2021'
-    text: '#d79921'
+    background: '{{tab_unfocused_background}}'
+    border: '{{tab_unfocused_border}}'
+    text: '{{tab_unfocused_text}}'
 
 window_effects:
   # Visual effects to apply to the focused window.
@@ -95,7 +97,7 @@ window_effects:
     # ** Exclusive to Windows 11 due to API limitations.
     border:
       enabled: true
-      color: '#458588'
+      color: '{{focused_border}}'
 
     # Remove the title bar from the window's frame. Note that this can
     # cause rendering issues for some applications.
@@ -120,7 +122,7 @@ window_effects:
   other_windows:
     border:
       enabled: true
-      color: '#1d2021'
+      color: '{{other_border}}'
     hide_title_bar:
       enabled: false
     corner_style:

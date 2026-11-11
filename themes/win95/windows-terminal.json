@@ -1,0 +1,31 @@
+{
+  "schemes": [
+    {
+      "name": "Hyper",
+      "background": "#000000",
+      "foreground": "#FFFFFF",
+      "cursorColor": "#FFFFFF",
+      "selectionBackground": "#000080",
+      "black": "#000000",
+      "red": "#FE0100",
+      "green": "#33FF00",
+      "yellow": "#FEFF00",
+      "blue": "#0066FF",
+      "purple": "#CC00FF",
+      "cyan": "#00FFFF",
+      "white": "#D0D0D0",
+      "brightBlack": "#808080",
+      "brightRed": "#FE0100",
+      "brightGreen": "#33FF00",
+      "brightYellow": "#FEFF00",
+      "brightBlue": "#0066FF",
+      "brightPurple": "#CC00FF",
+      "brightCyan": "#00FFFF",
+      "brightWhite": "#FFFFFF"
+    }
+  ],
+  "profiles": [
+    { "updates": "{61c54bbd-c2c6-5271-96e7-009a87ff44bf}", "colorScheme": "Hyper" },
+    { "updates": "{0caa0dad-35be-5f56-a8ff-afceeeaa6101}", "colorScheme": "Hyper" }
+  ]
+}

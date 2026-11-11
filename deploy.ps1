@@ -1,34 +1,44 @@
 <#
 .SYNOPSIS
   Sets up a tiling desktop on Windows 11: GlazeWM (with sway-style tabs),
-  a Zebar bar, Flow Launcher and a gruvbox look.
+  a Zebar bar, Flow Launcher and a theme (gruvbox or win95).
 
 .DESCRIPTION
-  Everything is per user and reversible. Existing config files are backed
-  up before they are replaced, to
-  %LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>.
+  Run without parameters, it asks which theme to use and whether to remap
+  the left Windows key, like the prompts of the setup-desktop-environment
+  Ansible playbooks, then shows a summary before changing anything.
+
+  Everything is per user. Existing config files are backed up before they
+  are replaced, to %LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>.
 
   Steps (each can be skipped with -Skip):
-    Apps       Installs Zebar and Flow Launcher (and AutoHotkey with
-               -KeyRemap AutoHotkey) with winget.
+    Apps       Installs Git, Zebar and Flow Launcher (and AutoHotkey with
+               -KeyRemap AutoHotkey) with winget, unless already installed.
     GlazeWM    Downloads the GlazeWM release zip from GitHub, checks its
                SHA256 and unpacks it to -InstallDir.
-    Dotfiles   Copies the GlazeWM, Zebar, Flow Launcher and Windows
-               Terminal configs into place.
-    Theme      Dark mode, gruvbox accent colours, small taskbar and the
-               wallpaper.
+    Dotfiles   Writes the GlazeWM, Zebar, Flow Launcher and Windows
+               Terminal configs for the chosen theme.
+    Theme      Light or dark mode, accent colours, small taskbar and the
+               theme's wallpaper.
     Autostart  Adds shortcuts to the Startup folder for GlazeWM (which
                starts Zebar), Flow Launcher and the key remap.
 
   Run it in your own desktop session, not over SSH or as another user.
 
-.PARAMETER Skip
-  Steps to leave out, e.g. -Skip Apps,Theme.
+.PARAMETER Theme
+  A folder name under themes\ (gruvbox, win95). Asked for if left out.
 
 .PARAMETER KeyRemap
   'AutoHotkey' makes the left Windows key act as Alt, so the alt+...
   bindings can be pressed with the Windows key like a sway Mod4 setup.
-  'None' (default) leaves the keyboard alone.
+  'None' leaves the keyboard alone. Asked for if left out.
+
+.PARAMETER Skip
+  Steps to leave out, e.g. -Skip Apps,Theme.
+
+.PARAMETER Unattended
+  Don't ask anything. Uses -Theme gruvbox and -KeyRemap None unless they
+  are given.
 
 .PARAMETER GlazeWMRepository
   GitHub repository to download GlazeWM from. Its releases must contain
@@ -48,15 +58,19 @@
   powershell -ExecutionPolicy Bypass -File .\deploy.ps1
 
 .EXAMPLE
-  powershell -ExecutionPolicy Bypass -File .\deploy.ps1 -KeyRemap AutoHotkey -WhatIf
+  powershell -ExecutionPolicy Bypass -File .\deploy.ps1 -Theme win95 -KeyRemap None -Unattended
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
+  [string]$Theme,
+
+  [ValidateSet('None', 'AutoHotkey')]
+  [string]$KeyRemap,
+
   [ValidateSet('Apps', 'GlazeWM', 'Dotfiles', 'Theme', 'Autostart')]
   [string[]]$Skip = @(),
 
-  [ValidateSet('None', 'AutoHotkey')]
-  [string]$KeyRemap = 'None',
+  [switch]$Unattended,
 
   [string]$GlazeWMRepository = 'CluelessTechnologist/glazewm',
 
@@ -77,6 +91,7 @@ $backupDir = Join-Path $env:LOCALAPPDATA "setup-windows-desktop\backup\$(Get-Dat
 $glazeDir = Join-Path $HOME '.glzr'
 $flowDir = Join-Path $env:APPDATA 'FlowLauncher'
 $startupDir = [Environment]::GetFolderPath('Startup')
+$utf8 = New-Object Text.UTF8Encoding $false
 
 function Write-Step([string]$text) {
   Write-Host "==> $text" -ForegroundColor Yellow
@@ -86,33 +101,98 @@ function Test-Step([string]$name) {
   -not ($Skip -contains $name)
 }
 
+# Asks to pick one of $options; Enter picks $default.
+function Read-Choice([string]$question, [string[]]$options, [string]$default) {
+  while ($true) {
+    $answer = (Read-Host "$question ($($options -join '/')) [$default]").Trim()
+    if (-not $answer) { return $default }
+    $match = $options | Where-Object { $_ -eq $answer }
+    if ($match) { return $match }
+    Write-Host "    Please answer one of: $($options -join ', ')"
+  }
+}
+
+# Backs up a file that is about to be replaced.
+function Backup-File([string]$path) {
+  $relative = $path.Substring((Split-Path $path -Qualifier).Length).TrimStart('\')
+  $backup = Join-Path $backupDir $relative
+  New-Item -ItemType Directory -Force (Split-Path $backup) | Out-Null
+  Copy-Item $path $backup -Force
+  Write-Host "    backed up $path"
+}
+
+# SHA256 of a file, lowercase hex. (Get-FileHash returns nothing under
+# -WhatIf in Windows PowerShell, so it can't be used for comparisons.)
+function Get-Sha256([string]$path) {
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try {
+    $bytes = $sha.ComputeHash([IO.File]::ReadAllBytes($path))
+    -join ($bytes | ForEach-Object { $_.ToString('x2') })
+  } finally {
+    $sha.Dispose()
+  }
+}
+
 # Copies a file into place, backing up the file it replaces.
 function Install-File([string]$from, [string]$to) {
+  if ((Test-Path $to) -and (Get-Sha256 $to) -eq (Get-Sha256 $from)) {
+    Write-Host "    $to (unchanged)"
+    return
+  }
   if (-not $PSCmdlet.ShouldProcess($to, "Copy $from")) { return }
 
-  if ((Test-Path $to) -and ((Get-FileHash $to).Hash -ne (Get-FileHash $from).Hash)) {
-    $relative = $to.Substring((Split-Path $to -Qualifier).Length).TrimStart('\')
-    $backup = Join-Path $backupDir $relative
-    New-Item -ItemType Directory -Force (Split-Path $backup) | Out-Null
-    Copy-Item $to $backup -Force
-    Write-Host "    backed up $to"
-  }
-
+  if (Test-Path $to) { Backup-File $to }
   New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
   Copy-Item $from $to -Force
   Write-Host "    $to"
 }
 
-function Install-WingetPackage([string]$id) {
-  winget list --id $id -e --accept-source-agreements | Out-Null
-  if ($LASTEXITCODE -eq 0) {
-    Write-Host "    $id is already installed"
+# Writes text to a file (UTF-8 without BOM), backing up the file it replaces.
+function Install-Content([string]$content, [string]$to) {
+  if ((Test-Path $to) -and [IO.File]::ReadAllText($to) -eq $content) {
+    Write-Host "    $to (unchanged)"
     return
   }
+  if (-not $PSCmdlet.ShouldProcess($to, 'Write')) { return }
 
-  if ($PSCmdlet.ShouldProcess($id, 'winget install')) {
-    winget install --id $id -e --silent --accept-package-agreements --accept-source-agreements
-    if ($LASTEXITCODE -ne 0) { throw "winget failed to install $id (exit $LASTEXITCODE)." }
+  if (Test-Path $to) { Backup-File $to }
+  New-Item -ItemType Directory -Force (Split-Path $to) | Out-Null
+  [IO.File]::WriteAllText($to, $content, $utf8)
+  Write-Host "    $to"
+}
+
+# Fills in the {{name}} placeholders of a template file.
+function Expand-Template([string]$path, [hashtable]$values) {
+  $text = [IO.File]::ReadAllText($path)
+  foreach ($key in $values.Keys) {
+    $text = $text.Replace("{{$key}}", $values[$key])
+  }
+  $missing = [regex]::Matches($text, '\{\{(\w+)\}\}') | ForEach-Object { $_.Groups[1].Value }
+  if ($missing) { throw "No value for {{$($missing -join '}}, {{')}} in $path." }
+  $text
+}
+
+# Whether an app is installed: by its program file or command, or else by
+# asking winget (which also finds apps installed without winget).
+function Test-Installed($package) {
+  foreach ($path in $package.Paths) {
+    if (Test-Path $path) { return $true }
+  }
+  if ($package.Command -and (Get-Command $package.Command -ErrorAction SilentlyContinue)) {
+    return $true
+  }
+  winget list --id $package.Id -e --accept-source-agreements | Out-Null
+  $LASTEXITCODE -eq 0
+}
+
+function Install-WingetPackage($package) {
+  if (Test-Installed $package) {
+    Write-Host "    $($package.Name) is already installed"
+    return
+  }
+  if ($PSCmdlet.ShouldProcess($package.Id, 'winget install')) {
+    winget install --id $package.Id -e --silent --accept-package-agreements --accept-source-agreements
+    if ($LASTEXITCODE -ne 0) { throw "winget failed to install $($package.Id) (exit $LASTEXITCODE)." }
   }
 }
 
@@ -145,11 +225,15 @@ function New-StartupShortcut([string]$name, [string]$target, [string]$arguments 
   Write-Host "    $path"
 }
 
+function ConvertTo-Rgb([string]$hex) {
+  [Convert]::ToByte($hex.Substring(1, 2), 16)
+  [Convert]::ToByte($hex.Substring(3, 2), 16)
+  [Convert]::ToByte($hex.Substring(5, 2), 16)
+}
+
 # Registry colours are stored as 0xAABBGGRR.
 function ConvertTo-Abgr([string]$hex) {
-  $r = [Convert]::ToByte($hex.Substring(1, 2), 16)
-  $g = [Convert]::ToByte($hex.Substring(3, 2), 16)
-  $b = [Convert]::ToByte($hex.Substring(5, 2), 16)
+  $r, $g, $b = ConvertTo-Rgb $hex
   [BitConverter]::ToInt32([byte[]]($r, $g, $b, 0xFF), 0)
 }
 
@@ -158,6 +242,59 @@ if ($env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
 }
 if ([Environment]::OSVersion.Version.Build -lt 22000) {
   Write-Warning 'This is not Windows 11. Window borders and the small taskbar need Windows 11.'
+}
+
+# Session 0 (SSH, services) has no desktop: stopping GlazeWM from there
+# would close the user's window manager, and apps started there are
+# invisible.
+if ((Get-Process -Id $PID).SessionId -eq 0 -and -not $WhatIfPreference) {
+  throw 'Run this in your own desktop session, not over SSH or as a service. -WhatIf works anywhere.'
+}
+
+# Choices: from parameters, else asked. -Unattended (and -WhatIf) use the
+# defaults instead of asking.
+$themes = @((Get-ChildItem (Join-Path $repo 'themes') -Directory).Name)
+$ask = -not $Unattended -and -not $WhatIfPreference
+if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap)) {
+  throw 'Cannot ask for the theme and key remap here. Pass -Theme and -KeyRemap, or -Unattended for the defaults.'
+}
+
+if (-not $Theme) {
+  if ($ask) {
+    foreach ($name in $themes) {
+      $description = (Import-PowerShellDataFile (Join-Path $repo "themes\$name\theme.psd1")).Description
+      Write-Host "    $name - $description"
+    }
+    $Theme = Read-Choice 'Choose theme' $themes 'gruvbox'
+  } else {
+    $Theme = 'gruvbox'
+  }
+}
+if ($themes -notcontains $Theme) {
+  throw "Unknown theme '$Theme'. Available: $($themes -join ', ')."
+}
+if (-not $KeyRemap) {
+  $KeyRemap = if ($ask) {
+    $remap = Read-Choice 'Make the left Windows key act as Alt with AutoHotkey?' @('yes', 'no') 'no'
+    if ($remap -eq 'yes') { 'AutoHotkey' } else { 'None' }
+  } else {
+    'None'
+  }
+}
+
+$themeDir = Join-Path $repo "themes\$Theme"
+$themeConfig = Import-PowerShellDataFile (Join-Path $themeDir 'theme.psd1')
+$steps = 'Apps', 'GlazeWM', 'Dotfiles', 'Theme', 'Autostart' | Where-Object { Test-Step $_ }
+
+Write-Host ''
+Write-Host "Theme:     $Theme"
+Write-Host "Key remap: $KeyRemap"
+Write-Host "Steps:     $($steps -join ', ')"
+Write-Host "GlazeWM:   $GlazeWMRepository ($GlazeWMVersion) -> $InstallDir"
+Write-Host ''
+if ($ask -and [Environment]::UserInteractive -and (Read-Choice 'Continue?' @('yes', 'no') 'yes') -eq 'no') {
+  Write-Host 'Nothing was changed.'
+  return
 }
 
 $glazeExe = Join-Path $InstallDir 'glazewm.exe'
@@ -170,10 +307,19 @@ if (Test-Step 'Apps') {
     throw 'winget is missing. Install "App Installer" from the Microsoft Store and run this again.'
   }
 
-  Install-WingetPackage 'glzr-io.zebar'
-  Install-WingetPackage 'Flow-Launcher.Flow-Launcher'
+  $packages = @(
+    @{ Name = 'Git'; Id = 'Git.Git'; Command = 'git'; Paths = @("$env:ProgramFiles\Git\cmd\git.exe") }
+    @{ Name = 'Zebar'; Id = 'glzr-io.zebar'; Command = 'zebar'; Paths = @("$env:ProgramFiles\glzr.io\Zebar\zebar.exe") }
+    @{ Name = 'Flow Launcher'; Id = 'Flow-Launcher.Flow-Launcher'; Paths = @($flowExe) }
+  )
   if ($KeyRemap -eq 'AutoHotkey') {
-    Install-WingetPackage 'AutoHotkey.AutoHotkey'
+    $packages += @{
+      Name = 'AutoHotkey'; Id = 'AutoHotkey.AutoHotkey'
+      Paths = @("$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe", "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey64.exe")
+    }
+  }
+  foreach ($package in $packages) {
+    Install-WingetPackage $package
   }
 }
 
@@ -210,7 +356,7 @@ if (Test-Step 'GlazeWM') {
         Where-Object { $_ -match "^([0-9a-f]{64})\s+\*?$([regex]::Escape($zipAsset.name))\s*$" } |
         ForEach-Object { $Matches[1] } |
         Select-Object -First 1
-      $actual = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+      $actual = Get-Sha256 $zip
       if (-not $expected -or $expected -ne $actual) {
         throw "SHA256 of $($zipAsset.name) doesn't match SHA256SUMS."
       }
@@ -232,31 +378,40 @@ if (Test-Step 'GlazeWM') {
 }
 
 if (Test-Step 'Dotfiles') {
-  Write-Step 'Copying dotfiles'
-  Install-File "$dotfiles\glazewm\config.yaml" "$glazeDir\glazewm\config.yaml"
+  Write-Step "Writing dotfiles ($Theme)"
+  Install-Content (Expand-Template "$dotfiles\glazewm\config.yaml" $themeConfig.Placeholders) `
+    "$glazeDir\glazewm\config.yaml"
+
   Install-File "$dotfiles\zebar\settings.json" "$glazeDir\zebar\settings.json"
-  foreach ($file in Get-ChildItem "$dotfiles\zebar\gruvbox" -File) {
-    Install-File $file.FullName "$glazeDir\zebar\gruvbox\$($file.Name)"
+  foreach ($file in Get-ChildItem "$dotfiles\zebar\desktop-bar" -File) {
+    Install-File $file.FullName "$glazeDir\zebar\desktop-bar\$($file.Name)"
   }
+  Install-File "$themeDir\zebar.css" "$glazeDir\zebar\desktop-bar\styles.css"
 
   # Flow Launcher rewrites Settings.json when it exits, so it's stopped
-  # first. Only the keys in dotfiles\flowlauncher\settings.json are
+  # first and started again afterwards. Only the keys in
+  # dotfiles\flowlauncher\settings.json, the theme and the fonts are
   # changed; the rest of the user's settings are kept.
   $flowRunning = [bool](Get-Process Flow.Launcher -ErrorAction SilentlyContinue)
   if ($flowRunning -and $PSCmdlet.ShouldProcess('Flow Launcher', 'Stop')) {
     Get-Process Flow.Launcher | Stop-Process -Force
     Start-Sleep 1
   }
-  Install-File "$dotfiles\flowlauncher\Gruvbox.xaml" "$flowDir\Themes\Gruvbox.xaml"
+  Install-File "$themeDir\flowlauncher.xaml" "$flowDir\Themes\$($themeConfig.FlowTheme).xaml"
 
   $flowSettings = "$flowDir\Settings\Settings.json"
   if ($PSCmdlet.ShouldProcess($flowSettings, 'Merge Flow Launcher settings')) {
     $current = if (Test-Path $flowSettings) { Get-Content $flowSettings -Raw } else { '' }
     $settings = if ($current) { $current | ConvertFrom-Json } else { New-Object PSObject }
 
+    $overrides = Get-Content "$dotfiles\flowlauncher\settings.json" -Raw | ConvertFrom-Json
+    $overrides | Add-Member Theme $themeConfig.FlowTheme -Force
+    foreach ($font in 'QueryBoxFont', 'ResultFont', 'ResultSubFont') {
+      $overrides | Add-Member $font $themeConfig.FlowFont -Force
+    }
+
     # Flow writes its own JSON formatting, so compare values, not text.
     $changed = $false
-    $overrides = Get-Content "$dotfiles\flowlauncher\settings.json" -Raw | ConvertFrom-Json
     foreach ($property in $overrides.PSObject.Properties) {
       $old = $settings.PSObject.Properties[$property.Name]
       if (-not $old -or (ConvertTo-Json $old.Value -Compress) -ne (ConvertTo-Json $property.Value -Compress)) {
@@ -264,19 +419,13 @@ if (Test-Step 'Dotfiles') {
       }
       $settings | Add-Member -NotePropertyName $property.Name -NotePropertyValue $property.Value -Force
     }
-    $merged = $settings | ConvertTo-Json -Depth 32
 
     if (-not $changed) {
       Write-Host "    $flowSettings (unchanged)"
     } else {
-      if ($current) {
-        $backup = Join-Path $backupDir 'FlowLauncher\Settings.json'
-        New-Item -ItemType Directory -Force (Split-Path $backup) | Out-Null
-        Copy-Item $flowSettings $backup -Force
-        Write-Host "    backed up $flowSettings"
-      }
+      if ($current) { Backup-File $flowSettings }
       New-Item -ItemType Directory -Force (Split-Path $flowSettings) | Out-Null
-      Set-Content $flowSettings $merged -Encoding UTF8
+      [IO.File]::WriteAllText($flowSettings, ($settings | ConvertTo-Json -Depth 32), $utf8)
       Write-Host "    $flowSettings (merged)"
     }
   }
@@ -286,51 +435,46 @@ if (Test-Step 'Dotfiles') {
 
   # A fragment adds the colour scheme and applies it to the built-in
   # PowerShell and Command Prompt profiles, without editing settings.json.
-  Install-File "$dotfiles\windows-terminal\gruvbox.json" `
-    "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\gruvbox\gruvbox.json"
+  Install-File "$themeDir\windows-terminal.json" `
+    "$env:LOCALAPPDATA\Microsoft\Windows Terminal\Fragments\setup-windows-desktop\theme.json"
 
   if ($KeyRemap -eq 'AutoHotkey') {
     Install-File "$dotfiles\autohotkey\lwin-to-alt.ahk" $ahkScript
   }
 }
 
-if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', 'Apply gruvbox theme')) {
-  Write-Step 'Applying the gruvbox look'
+if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', "Apply $Theme")) {
+  Write-Step "Applying the $Theme look"
   $personalize = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
   $accent = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Accent'
   $dwm = 'HKCU:\Software\Microsoft\Windows\DWM'
   $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
   $desktop = 'HKCU:\Control Panel\Desktop'
 
-  # Dark mode for apps and the system.
-  Set-ItemProperty $personalize -Name AppsUseLightTheme -Value 0 -Type DWord
-  Set-ItemProperty $personalize -Name SystemUsesLightTheme -Value 0 -Type DWord
+  # Light or dark mode for apps and the system.
+  $light = [int](-not $themeConfig.DarkMode)
+  Set-ItemProperty $personalize -Name AppsUseLightTheme -Value $light -Type DWord
+  Set-ItemProperty $personalize -Name SystemUsesLightTheme -Value $light -Type DWord
 
-  # Accent: gruvbox yellow, with the dark shades (used by the taskbar and
-  # Start when the accent is shown there) replaced by gruvbox greys. Title
-  # bars stay uncoloured.
+  # Accent colour and its palette of shades, used by Start, the taskbar and
+  # (if enabled) window title bars.
   Set-ItemProperty $desktop -Name AutoColorization -Value '0'
-  $palette = '#fbf1c7', '#fabd2f', '#fabd2f', '#d79921', '#504945', '#3c3836', '#282828', '#1d2021'
-  $bytes = foreach ($color in $palette) {
-    [Convert]::ToByte($color.Substring(1, 2), 16)
-    [Convert]::ToByte($color.Substring(3, 2), 16)
-    [Convert]::ToByte($color.Substring(5, 2), 16)
-    0
-  }
+  $bytes = foreach ($color in $themeConfig.AccentPalette) { ConvertTo-Rgb $color; 0 }
   New-Item -Force $accent | Out-Null
   Set-ItemProperty $accent -Name AccentPalette -Value ([byte[]]$bytes) -Type Binary
-  Set-ItemProperty $accent -Name AccentColorMenu -Value (ConvertTo-Abgr '#d79921') -Type DWord
-  Set-ItemProperty $accent -Name StartColorMenu -Value (ConvertTo-Abgr '#3c3836') -Type DWord
-  Set-ItemProperty $dwm -Name ColorPrevalence -Value 0 -Type DWord
-  Set-ItemProperty $personalize -Name ColorPrevalence -Value 1 -Type DWord
+  Set-ItemProperty $accent -Name AccentColorMenu -Value (ConvertTo-Abgr $themeConfig.Accent) -Type DWord
+  Set-ItemProperty $accent -Name StartColorMenu -Value (ConvertTo-Abgr $themeConfig.StartColor) -Type DWord
+  Set-ItemProperty $dwm -Name AccentColor -Value (ConvertTo-Abgr $themeConfig.Accent) -Type DWord
+  Set-ItemProperty $dwm -Name ColorPrevalence -Value ([int][bool]$themeConfig.AccentOnTitleBars) -Type DWord
+  Set-ItemProperty $personalize -Name ColorPrevalence -Value ([int][bool]$themeConfig.AccentOnTaskbar) -Type DWord
 
   # Settings > Personalization > Taskbar > Taskbar size: Small. Applies the
   # next time Explorer starts (sign out and in).
   Set-ItemProperty $advanced -Name TaskbarSize -Value 1 -Type DWord
 
-  # Wallpaper scaled to fill the screen, on a #282828 background.
-  $wallpaper = Join-Path ([Environment]::GetFolderPath('MyPictures')) 'wallpaper_default_gruvbox.jpg'
-  Install-File "$repo\wallpapers\wallpaper_default_gruvbox.jpg" $wallpaper
+  # The theme's wallpaper, scaled to fill the screen, on the desktop colour.
+  $wallpaper = Join-Path ([Environment]::GetFolderPath('MyPictures')) $themeConfig.Wallpaper
+  Install-File "$repo\wallpapers\$($themeConfig.Wallpaper)" $wallpaper
 
   Add-Type @'
 using System; using System.Runtime.InteropServices;
@@ -344,8 +488,9 @@ public static class SetupDesktop {
   public static void Broadcast(string what) { IntPtr r; SendMessageTimeout((IntPtr)0xffff, 0x1A, IntPtr.Zero, what, 2, 5000, out r); }
 }
 '@
-  Set-ItemProperty 'HKCU:\Control Panel\Colors' -Name Background -Value '40 40 40'
-  [SetupDesktop]::SetSysColors(1, @(1), @(0x282828)) | Out-Null  # COLOR_DESKTOP, 0x00BBGGRR
+  $r, $g, $b = ConvertTo-Rgb $themeConfig.DesktopColor
+  Set-ItemProperty 'HKCU:\Control Panel\Colors' -Name Background -Value "$r $g $b"
+  [SetupDesktop]::SetSysColors(1, @(1), @([int]$r + 256 * $g + 65536 * $b)) | Out-Null  # COLOR_DESKTOP
   Set-ItemProperty $desktop -Name WallpaperStyle -Value '10'  # Fill
   Set-ItemProperty $desktop -Name TileWallpaper -Value '0'
   [SetupDesktop]::SystemParametersInfo(0x14, 0, $wallpaper, 3) | Out-Null  # SPI_SETDESKWALLPAPER

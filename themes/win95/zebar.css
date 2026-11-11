@@ -1,0 +1,115 @@
+/**
+ * Windows 95 bar styled after the win95 waybar config from the sway setup
+ * (CluelessTechnologist/setup-desktop-environment): a grey bar with
+ * bevelled modules, a navy focused workspace and a "pressed" clock.
+ */
+
+:root {
+  --bar: #7e7e7e;
+  --text: #000000;
+  --navy: #000080;
+  --light: #ffffff;
+  --dark: #404040;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--bar);
+  color: var(--text);
+  font-family: 'Microsoft Sans Serif', 'Segoe UI', sans-serif;
+  font-size: 9px;
+}
+
+div,
+span,
+button {
+  cursor: default;
+  user-select: none;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 100%;
+}
+
+.left,
+.center,
+.right {
+  display: flex;
+  align-items: center;
+}
+
+.center {
+  justify-content: center;
+}
+
+.right {
+  justify-content: flex-end;
+}
+
+/* Modules and buttons: raised 3D bevel, like waybar's #cpu, #custom-run. */
+.pill,
+.bevel {
+  margin: 2px 1px;
+  padding: 2px;
+  border: none;
+  border-left: 1px solid var(--light);
+  border-top: 1px solid var(--light);
+  border-bottom: 1px solid var(--dark);
+  box-shadow: 1px 1px 1px 0 #000000;
+  background: var(--bar);
+  color: var(--text);
+  font: inherit;
+  white-space: nowrap;
+}
+
+/* The clock looks pressed in. */
+.pill.clock {
+  border: 1px solid var(--dark);
+  box-shadow: 1px 1px 0 0 #000000;
+}
+
+/* Workspaces: flat, the focused one navy. */
+.workspaces {
+  display: flex;
+  height: 100%;
+}
+
+.workspace {
+  padding: 0 10px;
+  border: none;
+  background: var(--bar);
+  color: var(--text);
+  font: inherit;
+}
+
+.workspace.focused {
+  background: var(--navy);
+  color: var(--light);
+}
+
+.binding-mode {
+  font-style: italic;
+}
+
+/* System tray. */
+.tray {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.tray img {
+  width: 14px;
+  height: 14px;
+}

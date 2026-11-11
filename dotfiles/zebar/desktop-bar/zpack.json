@@ -1,8 +1,8 @@
 {
   "$schema": "https://github.com/glzr-io/zebar/raw/v3.0.0/resources/zpack-schema.json",
-  "name": "gruvbox",
+  "name": "desktop-bar",
   "version": "0.0.0",
-  "description": "Gruvbox bar styled after the waybar config from the sway setup.",
+  "description": "Bar styled after the waybar config from the sway setup. styles.css comes from the chosen theme.",
   "tags": ["topbar"],
   "previewImages": [],
   "repositoryUrl": "",

@@ -20,8 +20,8 @@
                SHA256 and unpacks it to -InstallDir.
     Dotfiles   Writes the GlazeWM, Zebar, Flow Launcher and Windows
                Terminal configs for the chosen theme.
-    Theme      Light or dark mode, accent colours, small taskbar and the
-               theme's wallpaper.
+    Theme      Light or dark mode, accent colours, small (and optionally
+               auto-hiding) taskbar and the theme's wallpaper.
     Autostart  Adds shortcuts to the Startup folder for GlazeWM (which
                starts Zebar), Flow Launcher and the key remap.
 
@@ -38,12 +38,16 @@
 .PARAMETER Firefox
   'Yes' installs Firefox, which alt+f1 starts. Asked for if left out.
 
+.PARAMETER AutoHideTaskbar
+  'Yes' hides the taskbar until the mouse touches the bottom edge, as the
+  Zebar bar takes its place. 'No' keeps it visible. Asked for if left out.
+
 .PARAMETER Skip
   Steps to leave out, e.g. -Skip Apps,Theme.
 
 .PARAMETER Unattended
-  Don't ask anything. Uses -Theme gruvbox, -KeyRemap None and -Firefox Yes
-  unless they are given.
+  Don't ask anything. Uses -Theme gruvbox, -KeyRemap None, -Firefox Yes
+  and -AutoHideTaskbar Yes unless they are given.
 
 .PARAMETER GlazeWMRepository
   GitHub repository to download GlazeWM from. Its releases must contain
@@ -80,6 +84,9 @@ param(
 
   [ValidateSet('Yes', 'No')]
   [string]$Firefox,
+
+  [ValidateSet('Yes', 'No')]
+  [string]$AutoHideTaskbar,
 
   # Validated below: `powershell -File` passes "Apps,Theme" as one string.
   [string[]]$Skip = @(),
@@ -297,8 +304,8 @@ if ((Get-Process -Id $PID).SessionId -eq 0 -and -not $WhatIfPreference) {
 # defaults instead of asking.
 $themes = @((Get-ChildItem (Join-Path $repo 'themes') -Directory).Name)
 $ask = -not $Unattended -and -not $WhatIfPreference
-if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap -or -not $Firefox)) {
-  throw 'Cannot ask questions here. Pass -Theme, -KeyRemap and -Firefox, or -Unattended for the defaults.'
+if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap -or -not $Firefox -or -not $AutoHideTaskbar)) {
+  throw 'Cannot ask questions here. Pass -Theme, -KeyRemap, -Firefox and -AutoHideTaskbar, or -Unattended for the defaults.'
 }
 
 if (-not $Theme) {
@@ -331,6 +338,14 @@ if (-not $Firefox) {
     'Yes'
   }
 }
+if (-not $AutoHideTaskbar) {
+  $AutoHideTaskbar = if ($ask) {
+    $answer = Read-Choice 'Auto-hide the Windows taskbar (the bar at the top replaces it)?' @('yes', 'no') 'yes'
+    if ($answer -eq 'yes') { 'Yes' } else { 'No' }
+  } else {
+    'Yes'
+  }
+}
 
 $themeDir = Join-Path $repo "themes\$Theme"
 $themeConfig = Import-PowerShellDataFile (Join-Path $themeDir 'theme.psd1')
@@ -340,6 +355,7 @@ Write-Host ''
 Write-Host "Theme:     $Theme"
 Write-Host "Key remap: $KeyRemap"
 Write-Host "Firefox:   $Firefox"
+Write-Host "Auto-hide: $AutoHideTaskbar"
 Write-Host "Steps:     $($steps -join ', ')"
 Write-Host "GlazeWM:   $GlazeWMRepository ($GlazeWMVersion) -> $InstallDir"
 Write-Host ''
@@ -645,6 +661,31 @@ public static class SetupDesktop {
     } else {
       Write-Host '    Sign out and in (or rerun with -RestartExplorer) for the taskbar to change.'
     }
+  }
+
+  # Settings > Personalization > Taskbar > Automatically hide the taskbar.
+  # Set through the shell, like Settings does: it applies at once and
+  # Explorer saves it itself. Done last, after a possible Explorer restart.
+  Add-Type -Name AppBar -Namespace SetupDesktop -MemberDefinition @'
+[StructLayout(LayoutKind.Sequential)]
+public struct APPBARDATA { public uint cbSize; public IntPtr hWnd; public uint uCallbackMessage; public uint uEdge; public int left, top, right, bottom; public IntPtr lParam; }
+[DllImport("shell32.dll")] public static extern UIntPtr SHAppBarMessage(uint msg, ref APPBARDATA data);
+[DllImport("user32.dll")] public static extern IntPtr FindWindow(string cls, string title);
+'@
+  $appBar = New-Object SetupDesktop.AppBar+APPBARDATA
+  $appBar.cbSize = [Runtime.InteropServices.Marshal]::SizeOf($appBar)
+  for ($i = 0; $i -lt 30 -and $appBar.hWnd -eq [IntPtr]::Zero; $i++) {
+    $appBar.hWnd = [SetupDesktop.AppBar]::FindWindow('Shell_TrayWnd', $null)
+    if ($appBar.hWnd -eq [IntPtr]::Zero) { Start-Sleep 1 }
+  }
+  $state = [SetupDesktop.AppBar]::SHAppBarMessage(4, [ref]$appBar).ToUInt32()  # ABM_GETSTATE
+  $autoHide = [uint32]($AutoHideTaskbar -eq 'Yes')  # ABS_AUTOHIDE
+  if (($state -band 1) -eq $autoHide) {
+    Write-Host "    Taskbar auto-hide: $AutoHideTaskbar (unchanged)"
+  } else {
+    $appBar.lParam = [IntPtr][int](($state -band -bnot 1) -bor $autoHide)
+    [SetupDesktop.AppBar]::SHAppBarMessage(10, [ref]$appBar) | Out-Null  # ABM_SETSTATE
+    Write-Host "    Taskbar auto-hide: $AutoHideTaskbar"
   }
 }
 

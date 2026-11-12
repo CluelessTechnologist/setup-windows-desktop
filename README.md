@@ -39,6 +39,7 @@ Like the Ansible playbooks, the script asks a few questions first, then shows a 
 Choose theme (gruvbox/win95) [gruvbox]:
 Make the left Windows key act as Alt with AutoHotkey? (yes/no) [no]:
 Install Firefox (started with alt+f1)? (yes/no) [yes]:
+Auto-hide the Windows taskbar (the bar at the top replaces it)? (yes/no) [yes]:
 ```
 
 Without git, download the repository as a zip and run `deploy.ps1` from the unpacked folder. `-ExecutionPolicy Bypass` only applies to this one run; the machine's execution policy isn't changed.
@@ -47,6 +48,8 @@ To see what would happen without changing anything, add `-WhatIf`. Run the scrip
 
 The taskbar only picks up light/dark mode, its size and colours when Explorer starts, so the script offers to restart Explorer when those changed. If you say no, sign out and back in later.
 
+The small taskbar (Settings > Personalization > Taskbar > Taskbar behaviors > Taskbar size) came with a later update to Windows 11. On a freshly installed Windows it may not work until Windows Update has run; the script sets it anyway, so it applies once the update is there.
+
 ## Options
 
 | Parameter | Default | |
@@ -54,7 +57,8 @@ The taskbar only picks up light/dark mode, its size and colours when Explorer st
 | `-Theme gruvbox\|win95` | asked | Which theme to deploy (a folder under `themes/`). |
 | `-KeyRemap None\|AutoHotkey` | asked | `AutoHotkey` also installs AutoHotkey and makes the left Windows key act as Alt. The Start menu stays on `ctrl+esc` and the right Windows key. |
 | `-Firefox Yes\|No` | asked | Install Firefox, which `alt+f1` starts. |
-| `-Unattended` | | Don't ask anything: `gruvbox`, `None` and `Yes` unless given. |
+| `-AutoHideTaskbar Yes\|No` | asked | Hide the Windows taskbar until the mouse touches the bottom edge. |
+| `-Unattended` | | Don't ask anything: `gruvbox`, `None`, and `Yes` for Firefox and auto-hide, unless given. |
 | `-Skip Apps,GlazeWM,Dotfiles,Theme,Autostart` | none | Leaves out steps, e.g. `-Skip Theme` to keep your current look. |
 | `-GlazeWMVersion v3.10.1-tabs.2` | `latest` | A specific release of the fork. |
 | `-GlazeWMRepository owner/repo` | `CluelessTechnologist/glazewm` | Installs GlazeWM from another fork. Its releases need a `*-x64.zip` and a `SHA256SUMS` file. |
@@ -75,7 +79,7 @@ So you know exactly what you're running:
   * `%APPDATA%\FlowLauncher\Themes\Gruvbox.xaml` or `Win95.xaml`, and a few keys in `%APPDATA%\FlowLauncher\Settings\Settings.json` (hotkey, theme, font, and skipping the first-run welcome guide). Your other Flow settings are kept.
   * A Windows Terminal fragment in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\setup-windows-desktop\` that adds the theme's colour scheme to the built-in PowerShell and Command Prompt profiles. Your `settings.json` isn't touched.
   * `~\.config\autohotkey\lwin-to-alt.ahk` with `-KeyRemap AutoHotkey`.
-* **Look (registry, `HKCU` only):** light or dark mode, the accent colour palette, accent on Start and taskbar (gruvbox) or on title bars (win95), small taskbar, desktop colour, and the theme's wallpaper copied to your Pictures folder.
+* **Look (registry, `HKCU` only):** light or dark mode, the accent colour palette, accent on Start and taskbar (gruvbox) or on title bars (win95), small taskbar, taskbar auto-hide (`-AutoHideTaskbar`), desktop colour, and the theme's wallpaper copied to your Pictures folder.
 * **Autostart:** shortcuts in your Startup folder (`shell:startup`) for GlazeWM, Flow Launcher and the key remap. GlazeWM starts Zebar itself.
 
 Every file that gets replaced is first copied to `%LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>\`.

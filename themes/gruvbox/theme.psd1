@@ -24,9 +24,12 @@
   FlowTheme = 'Gruvbox'
   FlowFont = 'Cascadia Mono'
 
-  # Windows look.
-  DarkMode = $true
-  # Accent palette from lightest to darkest (8 shades), and the accent.
+  # Windows look. Dark or light mode for apps, and for the system (taskbar,
+  # Start).
+  AppsDarkMode = $true
+  SystemDarkMode = $true
+  # Accent palette from lightest to darkest (8 shades), and the accent. With
+  # AccentOnTaskbar, the taskbar gets the 6th shade (here #3c3836).
   AccentPalette = @('#fbf1c7', '#fabd2f', '#fabd2f', '#d79921', '#504945', '#3c3836', '#282828', '#1d2021')
   Accent = '#d79921'
   StartColor = '#3c3836'

@@ -12,8 +12,9 @@
   are replaced, to %LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>.
 
   Steps (each can be skipped with -Skip):
-    Apps       Installs Git, Zebar and Flow Launcher (and AutoHotkey with
-               -KeyRemap AutoHotkey) with winget, unless already installed.
+    Apps       Installs Git, Vim, Zebar and Flow Launcher (plus Firefox
+               with -Firefox Yes and AutoHotkey with -KeyRemap AutoHotkey)
+               with winget, unless already installed. Adds Vim to PATH.
     GlazeWM    Downloads the GlazeWM release zip from GitHub, checks its
                SHA256 and unpacks it to -InstallDir.
     Dotfiles   Writes the GlazeWM, Zebar, Flow Launcher and Windows
@@ -33,12 +34,15 @@
   bindings can be pressed with the Windows key like a sway Mod4 setup.
   'None' leaves the keyboard alone. Asked for if left out.
 
+.PARAMETER Firefox
+  'Yes' installs Firefox, which alt+f1 starts. Asked for if left out.
+
 .PARAMETER Skip
   Steps to leave out, e.g. -Skip Apps,Theme.
 
 .PARAMETER Unattended
-  Don't ask anything. Uses -Theme gruvbox and -KeyRemap None unless they
-  are given.
+  Don't ask anything. Uses -Theme gruvbox, -KeyRemap None and -Firefox Yes
+  unless they are given.
 
 .PARAMETER GlazeWMRepository
   GitHub repository to download GlazeWM from. Its releases must contain
@@ -72,6 +76,9 @@ param(
 
   [ValidateSet('None', 'AutoHotkey')]
   [string]$KeyRemap,
+
+  [ValidateSet('Yes', 'No')]
+  [string]$Firefox,
 
   # Validated below: `powershell -File` passes "Apps,Theme" as one string.
   [string[]]$Skip = @(),
@@ -187,11 +194,18 @@ function Expand-Template([string]$path, [hashtable]$values) {
   $text
 }
 
-# Whether an app is installed: by its program file or command, or else by
-# asking winget (which also finds apps installed without winget).
+# Whether an app is installed: by its program file, its "App Paths" entry
+# (which installers register wherever they install to, and which
+# shell-exec uses to find e.g. firefox), its command, or else by asking
+# winget (which also finds many apps installed without winget).
 function Test-Installed($package) {
   foreach ($path in $package.Paths) {
     if (Test-Path $path) { return $true }
+  }
+  foreach ($root in 'HKCU:', 'HKLM:') {
+    if ($package.AppPath -and (Test-Path "$root\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\$($package.AppPath)")) {
+      return $true
+    }
   }
   if ($package.Command -and (Get-Command $package.Command -ErrorAction SilentlyContinue)) {
     return $true
@@ -282,8 +296,8 @@ if ((Get-Process -Id $PID).SessionId -eq 0 -and -not $WhatIfPreference) {
 # defaults instead of asking.
 $themes = @((Get-ChildItem (Join-Path $repo 'themes') -Directory).Name)
 $ask = -not $Unattended -and -not $WhatIfPreference
-if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap)) {
-  throw 'Cannot ask for the theme and key remap here. Pass -Theme and -KeyRemap, or -Unattended for the defaults.'
+if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap -or -not $Firefox)) {
+  throw 'Cannot ask questions here. Pass -Theme, -KeyRemap and -Firefox, or -Unattended for the defaults.'
 }
 
 if (-not $Theme) {
@@ -308,6 +322,14 @@ if (-not $KeyRemap) {
     'None'
   }
 }
+if (-not $Firefox) {
+  $Firefox = if ($ask) {
+    $answer = Read-Choice 'Install Firefox (started with alt+f1)?' @('yes', 'no') 'yes'
+    if ($answer -eq 'yes') { 'Yes' } else { 'No' }
+  } else {
+    'Yes'
+  }
+}
 
 $themeDir = Join-Path $repo "themes\$Theme"
 $themeConfig = Import-PowerShellDataFile (Join-Path $themeDir 'theme.psd1')
@@ -316,6 +338,7 @@ $steps = $allSteps | Where-Object { Test-Step $_ }
 Write-Host ''
 Write-Host "Theme:     $Theme"
 Write-Host "Key remap: $KeyRemap"
+Write-Host "Firefox:   $Firefox"
 Write-Host "Steps:     $($steps -join ', ')"
 Write-Host "GlazeWM:   $GlazeWMRepository ($GlazeWMVersion) -> $InstallDir"
 Write-Host ''
@@ -334,8 +357,19 @@ if (Test-Step 'Apps') {
     throw 'winget is missing. Install "App Installer" from the Microsoft Store and run this again.'
   }
 
+  # The Vim installer installs per user (Programs\Vim) or, as admin, for
+  # all users (Program Files\Vim\vim92).
+  $vimPaths = @(
+    "$env:LOCALAPPDATA\Programs\Vim\vim.exe"
+    "$env:ProgramFiles\Vim\vim*\vim.exe"
+    "${env:ProgramFiles(x86)}\Vim\vim*\vim.exe"
+  )
   $packages = @(
     @{ Name = 'Git'; Id = 'Git.Git'; Command = 'git'; Paths = @("$env:ProgramFiles\Git\cmd\git.exe") }
+    @{
+      Name = 'Vim'; Id = 'vim.vim'; Command = 'vim'
+      Paths = $vimPaths
+    }
     @{ Name = 'Zebar'; Id = 'glzr-io.zebar'; Command = 'zebar'; Paths = @("$env:ProgramFiles\glzr.io\Zebar\zebar.exe") }
     @{ Name = 'Flow Launcher'; Id = 'Flow-Launcher.Flow-Launcher'; Paths = @($flowExe) }
   )
@@ -345,8 +379,50 @@ if (Test-Step 'Apps') {
       Paths = @("$env:ProgramFiles\AutoHotkey\v2\AutoHotkey64.exe", "$env:LOCALAPPDATA\Programs\AutoHotkey\v2\AutoHotkey64.exe")
     }
   }
+  if ($Firefox -eq 'Yes') {
+    $packages += @{
+      Name = 'Firefox'; Id = 'Mozilla.Firefox'; AppPath = 'firefox.exe'
+      Paths = @(
+        "$env:ProgramFiles\Mozilla Firefox\firefox.exe"
+        "${env:ProgramFiles(x86)}\Mozilla Firefox\firefox.exe"
+        "$env:LOCALAPPDATA\Mozilla Firefox\firefox.exe"
+      )
+    }
+  }
   foreach ($package in $packages) {
     Install-WingetPackage $package
+  }
+
+  # The Vim installer doesn't put vim on PATH. An all-users install has the
+  # version in its folder (Vim\vim92), so other Vim folders are replaced in
+  # the user PATH.
+  $vim = $vimPaths | ForEach-Object { Get-Item $_ -ErrorAction SilentlyContinue } |
+    Sort-Object { $_.Directory.Name } -Descending | Select-Object -First 1
+  if ($vim) {
+    # Read the raw value, so entries like %USERPROFILE%\... stay unexpanded.
+    $environment = Get-Item 'HKCU:\Environment'
+    $userPath = $environment.GetValue('Path', '', 'DoNotExpandEnvironmentNames')
+    $entries = @($userPath -split ';' | Where-Object { $_ })
+    $newPath = if ($entries -contains $vim.DirectoryName) {
+      $userPath
+    } else {
+      (@($entries | Where-Object { $_ -notmatch '\\Vim(\\vim\d+)?\\?$' }) + $vim.DirectoryName) -join ';'
+    }
+
+    if ($newPath -eq $userPath) {
+      Write-Host "    Vim is on PATH ($($vim.DirectoryName))"
+    } elseif ($PSCmdlet.ShouldProcess('user PATH', "Add $($vim.DirectoryName)")) {
+      Set-ItemProperty 'HKCU:\Environment' -Name Path -Value $newPath -Type ExpandString
+      $env:Path = "$env:Path;$($vim.DirectoryName)"
+      # Tell Explorer, so terminals started from now on get the new PATH.
+      Add-Type -Name Environment -Namespace SetupDesktop -MemberDefinition @'
+[DllImport("user32.dll", CharSet = CharSet.Unicode)]
+public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, string l, uint flags, uint timeout, out IntPtr result);
+'@
+      $result = [IntPtr]::Zero
+      [SetupDesktop.Environment]::SendMessageTimeout([IntPtr]0xffff, 0x1A, [IntPtr]::Zero, 'Environment', 2, 5000, [ref]$result) | Out-Null
+      Write-Host "    Added $($vim.DirectoryName) to PATH. Open a new terminal to use vim."
+    }
   }
 }
 
@@ -489,10 +565,9 @@ if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', "Apply $The
   }
   $taskbarBefore = & $taskbarValues
 
-  # Light or dark mode for apps and the system.
-  $light = [int](-not $themeConfig.DarkMode)
-  Set-ItemProperty $personalize -Name AppsUseLightTheme -Value $light -Type DWord
-  Set-ItemProperty $personalize -Name SystemUsesLightTheme -Value $light -Type DWord
+  # Light or dark mode, separately for apps and the system (taskbar, Start).
+  Set-ItemProperty $personalize -Name AppsUseLightTheme -Value ([int](-not $themeConfig.AppsDarkMode)) -Type DWord
+  Set-ItemProperty $personalize -Name SystemUsesLightTheme -Value ([int](-not $themeConfig.SystemDarkMode)) -Type DWord
 
   # Accent colour and its palette of shades, used by Start, the taskbar and
   # (if enabled) window title bars.

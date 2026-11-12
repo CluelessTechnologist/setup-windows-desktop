@@ -38,6 +38,7 @@ Like the Ansible playbooks, the script asks a few questions first, then shows a 
     win95 - Windows 95: grey bevelled bar, navy focus and title bars
 Choose theme (gruvbox/win95) [gruvbox]:
 Make the left Windows key act as Alt with AutoHotkey? (yes/no) [no]:
+Install Firefox (started with alt+f1)? (yes/no) [yes]:
 ```
 
 Without git, download the repository as a zip and run `deploy.ps1` from the unpacked folder. `-ExecutionPolicy Bypass` only applies to this one run; the machine's execution policy isn't changed.
@@ -52,7 +53,8 @@ The taskbar only picks up light/dark mode, its size and colours when Explorer st
 |---|---|---|
 | `-Theme gruvbox\|win95` | asked | Which theme to deploy (a folder under `themes/`). |
 | `-KeyRemap None\|AutoHotkey` | asked | `AutoHotkey` also installs AutoHotkey and makes the left Windows key act as Alt. The Start menu stays on `ctrl+esc` and the right Windows key. |
-| `-Unattended` | | Don't ask anything: `gruvbox` and `None` unless given. |
+| `-Firefox Yes\|No` | asked | Install Firefox, which `alt+f1` starts. |
+| `-Unattended` | | Don't ask anything: `gruvbox`, `None` and `Yes` unless given. |
 | `-Skip Apps,GlazeWM,Dotfiles,Theme,Autostart` | none | Leaves out steps, e.g. `-Skip Theme` to keep your current look. |
 | `-GlazeWMVersion v3.10.1-tabs.2` | `latest` | A specific release of the fork. |
 | `-GlazeWMRepository owner/repo` | `CluelessTechnologist/glazewm` | Installs GlazeWM from another fork. Its releases need a `*-x64.zip` and a `SHA256SUMS` file. |
@@ -64,7 +66,8 @@ The taskbar only picks up light/dark mode, its size and colours when Explorer st
 
 So you know exactly what you're running:
 
-* **Apps (winget):** `Git.Git`, `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Each one is skipped if it's already installed, also when it wasn't installed with winget. Git, Zebar and AutoHotkey install for all users, so Windows may ask for admin rights.
+* **Apps (winget):** `Git.Git`, `vim.vim`, `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, plus `Mozilla.Firefox` with `-Firefox Yes` and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Each one is skipped if it's already installed, also when it was installed with a normal installer instead of winget: the script looks for the program file, its "App Paths" registry entry and its command before asking winget. Most of them install for all users, so Windows may ask for admin rights.
+* **PATH:** the Vim folder (`%LOCALAPPDATA%\Programs\Vim`, or e.g. `C:\Program Files\Vim\vim92` for an all-users install) is added to your user PATH, so `vim` works in any new terminal. An older Vim entry is replaced, and other entries are kept as they are.
 * **GlazeWM:** the latest release zip of the fork, from GitHub. The download is checked against the release's `SHA256SUMS` before it's unpacked to `-InstallDir`. The binaries are built by the fork's [release workflow](https://github.com/CluelessTechnologist/glazewm/blob/fork/.github/workflows/fork-release.yaml) and are **not code signed**.
 * **Config files:**
   * `~\.glzr\glazewm\config.yaml`, with the theme's colours filled in.

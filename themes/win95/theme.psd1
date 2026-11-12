@@ -23,12 +23,16 @@
   FlowTheme = 'Win95'
   FlowFont = 'Microsoft Sans Serif'
 
-  # Light mode with navy title bars, like Windows 95.
-  DarkMode = $false
-  AccentPalette = @('#c0c0ff', '#8080ff', '#4040c0', '#000080', '#000070', '#000060', '#000050', '#000040')
+  # Light apps with navy title bars, like Windows 95. The system is in dark
+  # mode only because Windows shows the accent on the taskbar only then: the
+  # taskbar and Start get the 6th palette shade, Win95 grey #7e7e7e (with
+  # white text and icons).
+  AppsDarkMode = $false
+  SystemDarkMode = $true
+  AccentPalette = @('#c0c0ff', '#8080ff', '#4040c0', '#000080', '#a0a0a0', '#7e7e7e', '#5e5e5e', '#404040')
   Accent = '#000080'
-  StartColor = '#000080'
-  AccentOnTaskbar = $false
+  StartColor = '#7e7e7e'
+  AccentOnTaskbar = $true
   AccentOnTitleBars = $true
   DesktopColor = '#008080'
   Wallpaper = 'wallpaper_default_win95.jpg'

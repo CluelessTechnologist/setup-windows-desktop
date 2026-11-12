@@ -12,9 +12,10 @@
   are replaced, to %LOCALAPPDATA%\setup-windows-desktop\backup\<timestamp>.
 
   Steps (each can be skipped with -Skip):
-    Apps       Installs Git, Vim, Zebar and Flow Launcher (plus Firefox
-               with -Firefox Yes and AutoHotkey with -KeyRemap AutoHotkey)
-               with winget, unless already installed. Adds Vim to PATH.
+    Apps       Installs the Visual C++ runtime, Git, Vim, Zebar and Flow
+               Launcher (plus Firefox with -Firefox Yes and AutoHotkey with
+               -KeyRemap AutoHotkey) with winget, unless already installed.
+               Adds Vim to PATH.
     GlazeWM    Downloads the GlazeWM release zip from GitHub, checks its
                SHA256 and unpacks it to -InstallDir.
     Dotfiles   Writes the GlazeWM, Zebar, Flow Launcher and Windows
@@ -365,6 +366,12 @@ if (Test-Step 'Apps') {
     "${env:ProgramFiles(x86)}\Vim\vim*\vim.exe"
   )
   $packages = @(
+    # GlazeWM needs the Visual C++ runtime (vcruntime140.dll), which a fresh
+    # Windows doesn't have.
+    @{
+      Name = 'Visual C++ runtime'; Id = 'Microsoft.VCRedist.2015+.x64'
+      Paths = @("$env:windir\System32\vcruntime140.dll")
+    }
     @{ Name = 'Git'; Id = 'Git.Git'; Command = 'git'; Paths = @("$env:ProgramFiles\Git\cmd\git.exe") }
     @{
       Name = 'Vim'; Id = 'vim.vim'; Command = 'vim'

@@ -1,5 +1,6 @@
 {
   "Hotkey": "Alt + D",
   "UseDropShadowEffect": false,
-  "HideOnStartup": true
+  "HideOnStartup": true,
+  "FirstLaunch": false
 }

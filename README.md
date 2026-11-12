@@ -66,13 +66,13 @@ The taskbar only picks up light/dark mode, its size and colours when Explorer st
 
 So you know exactly what you're running:
 
-* **Apps (winget):** `Git.Git`, `vim.vim`, `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, plus `Mozilla.Firefox` with `-Firefox Yes` and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Each one is skipped if it's already installed, also when it was installed with a normal installer instead of winget: the script looks for the program file, its "App Paths" registry entry and its command before asking winget. Most of them install for all users, so Windows may ask for admin rights.
+* **Apps (winget):** `Microsoft.VCRedist.2015+.x64` (the Visual C++ runtime, which GlazeWM needs), `Git.Git`, `vim.vim`, `glzr-io.zebar`, `Flow-Launcher.Flow-Launcher`, plus `Mozilla.Firefox` with `-Firefox Yes` and `AutoHotkey.AutoHotkey` with `-KeyRemap AutoHotkey`. Each one is skipped if it's already installed, also when it was installed with a normal installer instead of winget: the script looks for the program file, its "App Paths" registry entry and its command before asking winget. Most of them install for all users, so Windows may ask for admin rights.
 * **PATH:** the Vim folder (`%LOCALAPPDATA%\Programs\Vim`, or e.g. `C:\Program Files\Vim\vim92` for an all-users install) is added to your user PATH, so `vim` works in any new terminal. An older Vim entry is replaced, and other entries are kept as they are.
 * **GlazeWM:** the latest release zip of the fork, from GitHub. The download is checked against the release's `SHA256SUMS` before it's unpacked to `-InstallDir`. The binaries are built by the fork's [release workflow](https://github.com/CluelessTechnologist/glazewm/blob/fork/.github/workflows/fork-release.yaml) and are **not code signed**.
 * **Config files:**
   * `~\.glzr\glazewm\config.yaml`, with the theme's colours filled in.
   * `~\.glzr\zebar\settings.json` and `~\.glzr\zebar\desktop-bar\`
-  * `%APPDATA%\FlowLauncher\Themes\Gruvbox.xaml` or `Win95.xaml`, and a few keys in `%APPDATA%\FlowLauncher\Settings\Settings.json` (hotkey, theme, font). Your other Flow settings are kept.
+  * `%APPDATA%\FlowLauncher\Themes\Gruvbox.xaml` or `Win95.xaml`, and a few keys in `%APPDATA%\FlowLauncher\Settings\Settings.json` (hotkey, theme, font, and skipping the first-run welcome guide). Your other Flow settings are kept.
   * A Windows Terminal fragment in `%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\setup-windows-desktop\` that adds the theme's colour scheme to the built-in PowerShell and Command Prompt profiles. Your `settings.json` isn't touched.
   * `~\.config\autohotkey\lwin-to-alt.ahk` with `-KeyRemap AutoHotkey`.
 * **Look (registry, `HKCU` only):** light or dark mode, the accent colour palette, accent on Start and taskbar (gruvbox) or on title bars (win95), small taskbar, desktop colour, and the theme's wallpaper copied to your Pictures folder.

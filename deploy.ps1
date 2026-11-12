@@ -42,12 +42,16 @@
   'Yes' hides the taskbar until the mouse touches the bottom edge, as the
   Zebar bar takes its place. 'No' keeps it visible. Asked for if left out.
 
+.PARAMETER HideDesktopIcons
+  'Yes' turns off View > Show desktop icons, as the desktop is covered by
+  tiled windows anyway. 'No' shows them. Asked for if left out.
+
 .PARAMETER Skip
   Steps to leave out, e.g. -Skip Apps,Theme.
 
 .PARAMETER Unattended
-  Don't ask anything. Uses -Theme gruvbox, -KeyRemap None, -Firefox Yes
-  and -AutoHideTaskbar Yes unless they are given.
+  Don't ask anything. Uses -Theme gruvbox, -KeyRemap None, and Yes for
+  -Firefox, -AutoHideTaskbar and -HideDesktopIcons unless they are given.
 
 .PARAMETER GlazeWMRepository
   GitHub repository to download GlazeWM from. Its releases must contain
@@ -65,8 +69,8 @@
 
 .PARAMETER RestartExplorer
   Restart Explorer at the end of the Theme step, without asking. The
-  taskbar only picks up light/dark mode, its size and accent colour when
-  Explorer starts. Without this, the script asks when those settings
+  taskbar only picks up light/dark mode, its size and accent colour, and
+  the desktop whether to show icons, when Explorer starts. Without this, the script asks when those settings
   changed. Open File Explorer windows are closed.
 
 .EXAMPLE
@@ -87,6 +91,9 @@ param(
 
   [ValidateSet('Yes', 'No')]
   [string]$AutoHideTaskbar,
+
+  [ValidateSet('Yes', 'No')]
+  [string]$HideDesktopIcons,
 
   # Validated below: `powershell -File` passes "Apps,Theme" as one string.
   [string[]]$Skip = @(),
@@ -304,8 +311,8 @@ if ((Get-Process -Id $PID).SessionId -eq 0 -and -not $WhatIfPreference) {
 # defaults instead of asking.
 $themes = @((Get-ChildItem (Join-Path $repo 'themes') -Directory).Name)
 $ask = -not $Unattended -and -not $WhatIfPreference
-if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap -or -not $Firefox -or -not $AutoHideTaskbar)) {
-  throw 'Cannot ask questions here. Pass -Theme, -KeyRemap, -Firefox and -AutoHideTaskbar, or -Unattended for the defaults.'
+if ($ask -and -not [Environment]::UserInteractive -and (-not $Theme -or -not $KeyRemap -or -not $Firefox -or -not $AutoHideTaskbar -or -not $HideDesktopIcons)) {
+  throw 'Cannot ask questions here. Pass -Theme, -KeyRemap, -Firefox, -AutoHideTaskbar and -HideDesktopIcons, or -Unattended for the defaults.'
 }
 
 if (-not $Theme) {
@@ -346,6 +353,14 @@ if (-not $AutoHideTaskbar) {
     'Yes'
   }
 }
+if (-not $HideDesktopIcons) {
+  $HideDesktopIcons = if ($ask) {
+    $answer = Read-Choice 'Hide the desktop icons (windows cover the desktop anyway)?' @('yes', 'no') 'yes'
+    if ($answer -eq 'yes') { 'Yes' } else { 'No' }
+  } else {
+    'Yes'
+  }
+}
 
 $themeDir = Join-Path $repo "themes\$Theme"
 $themeConfig = Import-PowerShellDataFile (Join-Path $themeDir 'theme.psd1')
@@ -356,6 +371,7 @@ Write-Host "Theme:     $Theme"
 Write-Host "Key remap: $KeyRemap"
 Write-Host "Firefox:   $Firefox"
 Write-Host "Auto-hide: $AutoHideTaskbar"
+Write-Host "No icons:  $HideDesktopIcons"
 Write-Host "Steps:     $($steps -join ', ')"
 Write-Host "GlazeWM:   $GlazeWMRepository ($GlazeWMVersion) -> $InstallDir"
 Write-Host ''
@@ -584,11 +600,12 @@ if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', "Apply $The
   $advanced = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
   $desktop = 'HKCU:\Control Panel\Desktop'
 
-  # The taskbar reads these only when Explorer starts.
+  # The taskbar and the desktop read these only when Explorer starts.
   $taskbarValues = {
     $values = foreach ($item in @(
         @($personalize, 'SystemUsesLightTheme'), @($personalize, 'ColorPrevalence'),
-        @($advanced, 'TaskbarSize'), @($accent, 'AccentColorMenu'), @($accent, 'StartColorMenu'))) {
+        @($advanced, 'TaskbarSize'), @($advanced, 'HideIcons'),
+        @($accent, 'AccentColorMenu'), @($accent, 'StartColorMenu'))) {
       (Get-ItemProperty $item[0] -ErrorAction SilentlyContinue).($item[1])
     }
     $values -join ','
@@ -614,6 +631,9 @@ if ((Test-Step 'Theme') -and $PSCmdlet.ShouldProcess('Windows look', "Apply $The
   # Settings > Personalization > Taskbar > Taskbar size: Small. Applies the
   # next time Explorer starts (sign out and in).
   Set-ItemProperty $advanced -Name TaskbarSize -Value 1 -Type DWord
+
+  # Desktop right-click > View > Show desktop icons.
+  Set-ItemProperty $advanced -Name HideIcons -Value ([int]($HideDesktopIcons -eq 'Yes')) -Type DWord
 
   # The theme's wallpaper, scaled to fill the screen, on the desktop colour.
   $wallpaper = Join-Path ([Environment]::GetFolderPath('MyPictures')) $themeConfig.Wallpaper
@@ -644,7 +664,7 @@ public static class SetupDesktop {
   $taskbarChanged = (& $taskbarValues) -ne $taskbarBefore
   if ($RestartExplorer -or $taskbarChanged) {
     $restart = $RestartExplorer -or ($ask -and [Environment]::UserInteractive -and
-      (Read-Choice 'Restart Explorer now so the taskbar picks up the change? Open File Explorer windows will close.' @('yes', 'no') 'yes') -eq 'yes')
+      (Read-Choice 'Restart Explorer now so the taskbar and desktop pick up the change? Open File Explorer windows will close.' @('yes', 'no') 'yes') -eq 'yes')
     if ($restart) {
       # Stop only the Explorer process that owns the taskbar; Windows starts
       # the shell again by itself.
@@ -659,7 +679,7 @@ public static class SetupDesktop {
       if (-not (Get-Process explorer -ErrorAction SilentlyContinue)) { Start-Process explorer.exe }
       Write-Host '    Explorer restarted.'
     } else {
-      Write-Host '    Sign out and in (or rerun with -RestartExplorer) for the taskbar to change.'
+      Write-Host '    Sign out and in (or rerun with -RestartExplorer) for the taskbar and desktop to change.'
     }
   }
 

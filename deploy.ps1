@@ -420,7 +420,6 @@ if (Test-Step 'Apps') {
       Write-Host "    Vim is on PATH ($($vim.DirectoryName))"
     } elseif ($PSCmdlet.ShouldProcess('user PATH', "Add $($vim.DirectoryName)")) {
       Set-ItemProperty 'HKCU:\Environment' -Name Path -Value $newPath -Type ExpandString
-      $env:Path = "$env:Path;$($vim.DirectoryName)"
       # Tell Explorer, so terminals started from now on get the new PATH.
       Add-Type -Name Environment -Namespace SetupDesktop -MemberDefinition @'
 [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -431,6 +430,14 @@ public static extern IntPtr SendMessageTimeout(IntPtr h, uint msg, IntPtr w, str
       Write-Host "    Added $($vim.DirectoryName) to PATH. Open a new terminal to use vim."
     }
   }
+
+  # Installers add their folders (e.g. Zebar's) to PATH in the registry, but
+  # this process still has the old PATH, and GlazeWM inherits it from here
+  # to run `shell-exec zebar`.
+  $env:Path = @(
+    [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    [Environment]::GetEnvironmentVariable('Path', 'User')
+  ) -join ';'
 }
 
 if (Test-Step 'GlazeWM') {

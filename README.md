@@ -15,6 +15,18 @@ Everything is per user. The script doesn't patch Windows, doesn't disable anythi
 | Modifier | `Mod4` (Windows key) | `alt`, optionally also the left Windows key ([AutoHotkey](https://www.autohotkey.com/)) |
 | Themes | gruvbox, win95 | gruvbox, win95: bar, tabs, launcher, terminal, light/dark mode, accent colours, wallpaper |
 
+## Screenshots
+
+Explorer and [ImageGlass](https://imageglass.org/) as floating windows, with the Zebar bar at the top.
+
+**gruvbox**
+
+![gruvbox theme](screenshots/gruvbox/gruvbox_desktop.jpg)
+
+**win95**
+
+![win95 theme](screenshots/win95/win95_desktop.jpg)
+
 ## Supported OSes
 
 * Windows 11 x64 (tested on 26H2)
@@ -144,7 +156,7 @@ To add a theme, copy `themes/gruvbox` to a new folder and change it. The script 
 * [GlazeWM](https://github.com/glzr-io/glazewm) and [Zebar](https://github.com/glzr-io/zebar) by glzr-io (GPL-3.0). The bar in `dotfiles/zebar/desktop-bar/` started from Zebar's starter pack.
 * The [gruvbox](https://github.com/morhetz/gruvbox) palette by Pavel Pertsev (MIT).
 * The win95 colours are the Base16 Windows 95 scheme by Fergus Collins, modified for setup-desktop-environment. The win95 terminal colours are the Hyper scheme from [alacritty-theme](https://github.com/alacritty/alacritty-theme).
-* The wallpapers are the same ones as in [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment).
+* The wallpapers are the same ones as in [setup-desktop-environment](https://github.com/CluelessTechnologist/setup-desktop-environment). So is the gruvbox lockscreen image shown in the gruvbox screenshot.
 
 ## License
 
